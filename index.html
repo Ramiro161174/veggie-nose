@@ -3,102 +3,134 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sensor Dashboard Web</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<title>Veggie-Nose Dashboard</title>
+<script src="vendor/chart.umd.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
 <style>
   :root{
-    --bg:#f3f4f6; --panel:#ffffff; --ink:#1f2937; --muted:#6b7280;
-    --line:#d1d5db; --ok:#16a34a; --bad:#dc2626;
+    --bg:#eef1f6; --panel:#ffffff; --ink:#1f2937; --muted:#6b7280; --line:#e2e6ec;
+    --brand:#2563eb; --brand2:#1d4ed8; --ok:#16a34a; --bad:#dc2626; --amber:#d97706;
+    --shadow:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:Segoe UI,system-ui,Arial,sans-serif;background:var(--bg);color:var(--ink)}
-  header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:#eef0f3;border-bottom:1px solid var(--line)}
-  input[type=text]{flex:1;min-width:150px;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px}
-  select,button{padding:9px 14px;border:none;border-radius:6px;font-size:14px;cursor:pointer}
-  button{background:linear-gradient(#5aa0f7,#3b82f6);color:#fff;font-weight:600}
-  button:hover{filter:brightness(1.05)}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  select{background:#fff;border:1px solid var(--line)}
-  .baud{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
-  .counter{margin-left:auto;background:var(--bad);color:#fff;font-weight:700;padding:9px 16px;border-radius:6px}
+  body{margin:0;font-family:"Segoe UI",system-ui,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  /* ---- Barra superior ---- */
+  .topbar{display:flex;align-items:center;gap:14px;padding:12px 18px;background:#0f172a;color:#fff}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:.2px}
+  .logo .dot{width:12px;height:12px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(22,163,74,.25)}
+  .logo small{font-weight:400;color:#94a3b8;font-size:12px;margin-left:2px}
+  .spacer{flex:1}
+  .pill{display:flex;align-items:center;gap:7px;background:#1e293b;padding:7px 12px;border-radius:999px;font-size:13px;color:#cbd5e1}
+  .pill .led{width:9px;height:9px;border-radius:50%;background:#64748b}
+  .pill.on .led{background:var(--ok);box-shadow:0 0 0 3px rgba(22,163,74,.25)}
+  .topbar select{background:#1e293b;color:#fff;border:1px solid #334155;border-radius:8px;padding:8px 10px;font-size:13px}
+  .topbar button{border:none;border-radius:8px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;color:#fff;background:linear-gradient(#3b82f6,#2563eb)}
+  .topbar button:hover{filter:brightness(1.07)}
+  .counter{background:var(--bad);font-weight:700;padding:8px 14px;border-radius:8px;color:#fff;font-size:13px}
   .counter.on{background:var(--ok)}
-  main{display:grid;grid-template-columns:1fr 300px;gap:12px;padding:12px}
-  @media(max-width:900px){main{grid-template-columns:1fr}}
-  .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  /* ---- Herramientas ---- */
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 18px;background:#fff;border-bottom:1px solid var(--line)}
+  .toolbar input[type=text]{flex:1;min-width:150px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+  .toolbar button{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer}
+  .toolbar button:hover{background:#f8fafc}
+  .toolbar button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .toolbar button:disabled{opacity:.45;cursor:not-allowed}
+  /* ---- Aviso ---- */
+  .warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:10px 14px;margin:12px 18px 0;border-radius:8px;font-size:13px}
+  /* ---- Panel experimento ---- */
+  .prog{margin:12px 18px 0}
+  .prog>button{width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:var(--shadow)}
+  .progpanel{background:#fff;border:1px solid var(--line);border-top:none;border-radius:0 0 10px 10px;padding:16px;box-shadow:var(--shadow)}
+  .pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:end}
+  @media(max-width:820px){.pgrid{grid-template-columns:1fr 1fr}}
+  .fld{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600}
+  .fld input,.fld select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;color:var(--ink);font-weight:400}
+  .profilewrap{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;margin-top:4px}
+  #profileCanvas{border:1px solid var(--line);border-radius:8px;background:#fafbfc}
+  .prow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .prow button{border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;color:#fff}
+  .btn-prog{background:var(--brand)}
+  .btn-exper{background:linear-gradient(#22c55e,#16a34a)}
+  .prow button:disabled{opacity:.45;cursor:not-allowed}
+  .cmdprev{margin-top:12px;font-size:12px;color:var(--muted)}
+  .cmdprev code{background:#f1f5f9;padding:3px 7px;border-radius:5px;color:#0f172a;font-size:12px;display:inline-block;margin:2px 4px 2px 0}
+  /* ---- Contenido ---- */
+  main{display:grid;grid-template-columns:1fr 310px;gap:14px;padding:14px 18px 24px}
+  @media(max-width:940px){main{grid-template-columns:1fr}}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media(max-width:620px){.charts{grid-template-columns:1fr}}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px}
-  .card h3{margin:2px 0 6px;font-size:13px;color:var(--muted);text-align:center;font-weight:600}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
+  .card h3{margin:0 0 8px;font-size:13px;color:var(--muted);text-align:center;font-weight:700;letter-spacing:.2px}
   .chartbox{position:relative;height:150px}
-  .side h3{margin:0 0 8px;font-size:14px}
-  .readout{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin-bottom:10px}
-  .readout div{font-size:13px}
-  .readout span{font-weight:700}
-  #log{background:#fafafa;border:1px solid var(--line);border-radius:6px;height:220px;overflow:auto;padding:8px;font-family:Consolas,monospace;font-size:11px;white-space:pre-wrap;word-break:break-word}
-  .status{font-size:12px;color:var(--muted);padding:6px 12px}
+  .side h3{margin:0 0 10px;font-size:15px}
+  .readout{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .ro{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+  .ro small{display:block;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+  .ro b{font-size:17px}
+  #log{background:#0f172a;color:#cbd5e1;border-radius:10px;height:210px;overflow:auto;padding:10px;font-family:Consolas,monospace;font-size:11.5px;white-space:pre-wrap;word-break:break-word}
+  .status{font-size:12px;color:var(--muted);padding:2px 18px}
   .status b{color:var(--ink)}
-  .warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:8px 12px;margin:0 12px;border-radius:6px;font-size:13px}
-  .progbar{padding:8px 12px 0}
-  button.ghost{background:#e5e7eb;color:var(--ink)}
-  .progpanel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:8px}
-  .pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-  @media(max-width:760px){.pgrid{grid-template-columns:1fr 1fr}}
-  .progpanel label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:4px}
-  .progpanel label.wide{grid-column:1/-1;margin-top:8px}
-  .progpanel input{padding:7px 8px;border:1px solid var(--line);border-radius:6px;font-size:14px;color:var(--ink)}
-  .prow{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
-  .preview{flex:1;font-size:13px;color:var(--muted)}
-  .preview code{background:#f3f4f6;padding:3px 7px;border-radius:4px;color:#111;font-size:13px}
 </style>
 </head>
 <body>
-<header>
-  <input id="cmd" type="text" placeholder="Comando a enviar…" autocomplete="off">
-  <button id="send" disabled>Send</button>
-  <div class="baud">baudios
+<div class="topbar">
+  <div class="logo"><span class="dot"></span> Veggie-Nose <small>Sensor Dashboard</small></div>
+  <div class="spacer"></div>
+  <div id="pill" class="pill"><span class="led"></span><span id="pilltxt">desconectado</span></div>
+  <label style="font-size:12px;color:#94a3b8">baudios
     <select id="baud">
       <option>9600</option><option>19200</option><option>38400</option>
       <option>57600</option><option selected>115200</option><option>230400</option><option>921600</option>
     </select>
-  </div>
+  </label>
   <button id="connect">Connect</button>
-  <button id="save" disabled>Save File</button>
   <div id="counter" class="counter">AIR SAMPLE: 0</div>
-</header>
-
-<div id="nowebserial" class="warn" style="display:none">
-  Este navegador no permite Web Serial. Abre la página en <b>Chrome</b> o <b>Edge</b> de escritorio (no Firefox, no móvil) y servida por <b>https://</b> o localhost.
 </div>
 
-<div class="progbar">
-  <button id="progToggle" class="ghost">⚙ Programar experimento ▾</button>
+<div class="toolbar">
+  <input id="cmd" type="text" placeholder="Comando manual a enviar…" autocomplete="off">
+  <button id="send" class="primary" disabled>Send</button>
+  <button id="saveXlsx" disabled>⬇ Guardar Excel</button>
+  <button id="saveCsv" disabled>⬇ CSV</button>
+  <button id="clear">Limpiar</button>
+</div>
+
+<div id="nowebserial" class="warn" style="display:none">
+  Este navegador no permite Web Serial. Ábrela en <b>Chrome</b> o <b>Edge</b> de escritorio (no Firefox ni móvil) y por <b>https://</b> o localhost. Abrir el archivo con doble clic (file://) tampoco funciona.
+</div>
+
+<div class="prog">
+  <button id="progToggle">⚙ Programar experimento ▾</button>
   <div id="progPanel" class="progpanel" style="display:none">
     <div class="pgrid">
-      <label>Nº de ciclos (NADSOR)
+      <label class="fld">Nº de ciclos (NADSOR)
         <input id="p_cyc" type="number" min="1" step="1" value="4"></label>
-      <label>Tiempo de adsorción (TADSOR) — múltiplos de 20
+      <label class="fld">Adsorción (TADSOR) · múltiplos de 20
         <input id="p_ads" type="number" min="20" step="20" value="20"></label>
-      <label>Tiempo de desorción (TDESOR) — múltiplos de 20
+      <label class="fld">Desorción (TDESOR) · múltiplos de 20
         <input id="p_des" type="number" min="20" step="20" value="20"></label>
-      <label>Perfil de temperatura (TPEXP)
+      <label class="fld">Perfil de temperatura (TPEXP)
         <select id="p_profile">
           <option value="sin">Sinusoidal (por defecto)</option>
           <option value="tri">Triangular</option>
           <option value="esc">Escalonado</option>
           <option value="custom">Personalizado…</option>
-        </select>
-      </label>
-      <label class="wide">Valores de temperatura — 20 valores °C separados por coma
-        <input id="p_temps" type="text"></label>
+        </select></label>
+      <div class="profilewrap">
+        <label class="fld" style="margin:0">20 valores de temperatura (°C), separados por coma
+          <input id="p_temps" type="text"></label>
+        <canvas id="profileCanvas" width="200" height="60"></canvas>
+      </div>
     </div>
     <div class="prow">
-      <button id="p_send" disabled>Programar (envía NADSOR, TADSOR, TDESOR, TPEXP)</button>
-      <button id="p_exper" disabled style="background:linear-gradient(#22c55e,#16a34a)">▶ Empezar experimento (EXPER)</button>
+      <button id="p_send" class="btn-prog" disabled>Programar (NADSOR · TADSOR · TDESOR · TPEXP)</button>
+      <button id="p_exper" class="btn-exper" disabled>▶ Empezar experimento (EXPER)</button>
     </div>
-    <div class="preview" id="p_preview" style="margin-top:8px"></div>
+    <div class="cmdprev" id="p_preview"></div>
   </div>
 </div>
 
-<div class="status">Estado: <b id="state">desconectado</b> · Muestras: <b id="rx">0</b></div>
+<div class="status">Estado: <b id="state">desconectado</b> · Muestras recibidas: <b id="rx">0</b> · Guardadas: <b id="stored">0</b></div>
 
 <main>
   <div class="charts">
@@ -110,14 +142,14 @@
     <div class="card"><h3>hp3</h3><div class="chartbox"><canvas id="c_hp3"></canvas></div></div>
   </div>
   <div class="side card">
-    <h3>Information:</h3>
+    <h3>Información</h3>
     <div class="readout">
-      <div>Temp: <span id="r_temp">—</span> °C</div>
-      <div>Humedad: <span id="r_hum">—</span> %</div>
-      <div>Presión: <span id="r_pres">—</span></div>
-      <div>raw_nox: <span id="r_nox">—</span></div>
-      <div>Índice: <span id="r_idx">—</span></div>
-      <div>timestamp: <span id="r_ts">—</span></div>
+      <div class="ro"><small>Temp °C</small><b id="r_temp">—</b></div>
+      <div class="ro"><small>Humedad %</small><b id="r_hum">—</b></div>
+      <div class="ro"><small>Presión</small><b id="r_pres">—</b></div>
+      <div class="ro"><small>raw_nox</small><b id="r_nox">—</b></div>
+      <div class="ro"><small>Índice</small><b id="r_idx">—</b></div>
+      <div class="ro"><small>timestamp</small><b id="r_ts">—</b></div>
     </div>
     <div id="log"></div>
   </div>
@@ -128,157 +160,152 @@ const $ = id => document.getElementById(id);
 const hasSerial = 'serial' in navigator;
 if(!hasSerial){ $('nowebserial').style.display='block'; $('connect').disabled=true; }
 
-// Columnas reales de la nariz (orden del archivo de datos)
 const KNOWN_COLS = ["timestamp","temperature","pressure","humidity","gas_resistance",
   "raw_voc","raw_nox","hp0","hp1","hp2","hp3","indice","airsample"];
 
 // ---- Gráficas ----
-const WINDOW = 200;
+const WINDOW=200;
 function makeChart(ctx,color){
   return new Chart(ctx,{type:'line',
-    data:{labels:[],datasets:[{data:[],borderColor:color,borderWidth:1.5,pointRadius:0,tension:.2}]},
+    data:{labels:[],datasets:[{data:[],borderColor:color,backgroundColor:color+'22',
+      borderWidth:1.6,pointRadius:0,tension:.25,fill:true}]},
     options:{animation:false,responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false}},
-      scales:{x:{display:false},y:{ticks:{font:{size:10}}}}}});
+      scales:{x:{display:false},y:{ticks:{font:{size:10}},grid:{color:'#eef2f7'}}}}});
 }
-const charts = {
-  gas_resistance: makeChart($('c_gas'),'#2563eb'),
-  raw_voc:        makeChart($('c_voc'),'#16a34a'),
-  hp0:            makeChart($('c_hp0'),'#d97706'),
-  hp1:            makeChart($('c_hp1'),'#db2777'),
-  hp2:            makeChart($('c_hp2'),'#7c3aed'),
-  hp3:            makeChart($('c_hp3'),'#0891b2'),
+const charts={
+  gas_resistance:makeChart($('c_gas'),'#2563eb'),
+  raw_voc:makeChart($('c_voc'),'#16a34a'),
+  hp0:makeChart($('c_hp0'),'#d97706'),
+  hp1:makeChart($('c_hp1'),'#db2777'),
+  hp2:makeChart($('c_hp2'),'#7c3aed'),
+  hp3:makeChart($('c_hp3'),'#0891b2'),
 };
 function push(ch,val){
-  const c=charts[ch]; if(!c||val==null||isNaN(val)) return;
+  const c=charts[ch]; if(!c||val==null||isNaN(val))return;
   c.data.labels.push(''); c.data.datasets[0].data.push(val);
   if(c.data.labels.length>WINDOW){c.data.labels.shift();c.data.datasets[0].data.shift();}
   c.update('none');
 }
 
 // ---- Estado ----
-let port=null, reader=null, writer=null, keepReading=false;
+let port=null,reader=null,writer=null,keepReading=false;
 let rxCount=0;
-const captured=[KNOWN_COLS.join(",")];   // para "Save File" (CSV con cabecera)
-let headerCols=null;
+const rows=[];   // filas guardadas (arrays en orden KNOWN_COLS) para Excel/CSV
 
 function log(line){
-  const el=$('log'); el.textContent += line+"\n"; el.scrollTop=el.scrollHeight;
+  const el=$('log'); el.textContent+=line+"\n"; el.scrollTop=el.scrollHeight;
   if(el.textContent.length>40000) el.textContent=el.textContent.slice(-30000);
 }
+function setPill(txt,on){ $('pilltxt').textContent=txt; $('pill').classList.toggle('on',!!on); $('state').textContent=txt; }
 
-// ---- Parseo de cada línea ----
+// ---- Parseo ----
+let headerCols=null;
 function parseLine(line){
-  line=line.trim(); if(!line) return null;
-  if(line[0]==='{'){ try{ return JSON.parse(line); }catch(e){} }
-  // pares clave:valor
+  line=line.trim(); if(!line)return null;
+  if(line[0]==='{'){ try{return JSON.parse(line);}catch(e){} }
   if(/[a-z_]+\s*[:=]\s*-?\d/i.test(line)){
-    const obj={}; let any=false;
-    line.split(/[;,]|\s{2,}|\t/).forEach(tok=>{
-      const m=tok.split(/[:=]/);
-      if(m.length===2){const k=m[0].trim();const v=parseFloat(m[1]);if(k&&!isNaN(v)){obj[k]=v;any=true;}}
-    });
-    if(any) return obj;
+    const o={};let any=false;
+    line.split(/[;,]|\s{2,}|\t/).forEach(tok=>{const m=tok.split(/[:=]/);
+      if(m.length===2){const k=m[0].trim();const v=parseFloat(m[1]);if(k&&!isNaN(v)){o[k]=v;any=true;}}});
+    if(any)return o;
   }
-  // CSV
   const parts=line.split(/[;,\t ]+/).map(s=>s.trim()).filter(s=>s!=='');
   const nums=parts.map(parseFloat);
-  const allNum = nums.length>1 && nums.every(n=>!isNaN(n));
-  if(allNum){
-    const cols = headerCols || (nums.length===KNOWN_COLS.length ? KNOWN_COLS : null);
-    if(cols){ const o={}; cols.forEach((k,i)=>o[k]=nums[i]); return o; }
+  if(nums.length>1 && nums.every(n=>!isNaN(n))){
+    const cols=headerCols||(nums.length===KNOWN_COLS.length?KNOWN_COLS:null);
+    if(cols){const o={};cols.forEach((k,i)=>o[k]=nums[i]);return o;}
     return {_cols:nums};
   }
-  // cabecera de texto
-  if(parts.length>1 && /[a-z]/i.test(line) && nums.some(isNaN)){
-    headerCols=parts; log('» cabecera: '+parts.join(', ')); return null;
-  }
+  if(parts.length>1 && /[a-z]/i.test(line) && nums.some(isNaN)){ headerCols=parts; log('» cabecera: '+parts.join(', ')); return null; }
   return null;
 }
-
-const setTxt=(id,v,dec)=>{ if(v!=null&&!isNaN(v)) $(id).textContent=(dec!=null?(+v).toFixed(dec):v); };
+const setTxt=(id,v,d)=>{ if(v!=null&&!isNaN(v)) $(id).textContent=(d!=null?(+v).toFixed(d):v); };
 
 function handleData(obj,raw){
   let known=false;
-  for(const k of ['gas_resistance','raw_voc','hp0','hp1','hp2','hp3']){
-    if(k in obj){ push(k,obj[k]); known=true; }
-  }
-  if('temperature' in obj){ setTxt('r_temp',obj.temperature,2); known=true; }
-  if('humidity'    in obj){ setTxt('r_hum',obj.humidity,1); }
-  if('pressure'    in obj){ setTxt('r_pres',obj.pressure,0); }
-  if('raw_nox'     in obj){ setTxt('r_nox',obj.raw_nox,0); }
-  if('indice'      in obj){ setTxt('r_idx',obj.indice,0); }
-  if('timestamp'   in obj){ setTxt('r_ts',obj.timestamp,0); }
-  if('airsample'   in obj){ $('counter').textContent='AIR SAMPLE: '+obj.airsample; }
-  if(!known) log(raw);   // formato no reconocido: lo muestra para calibrar
+  for(const k of ['gas_resistance','raw_voc','hp0','hp1','hp2','hp3']) if(k in obj){push(k,obj[k]);known=true;}
+  if('temperature' in obj){setTxt('r_temp',obj.temperature,2);known=true;}
+  if('humidity' in obj) setTxt('r_hum',obj.humidity,1);
+  if('pressure' in obj) setTxt('r_pres',obj.pressure,0);
+  if('raw_nox' in obj) setTxt('r_nox',obj.raw_nox,0);
+  if('indice' in obj) setTxt('r_idx',obj.indice,0);
+  if('timestamp' in obj) setTxt('r_ts',obj.timestamp,0);
+  if('airsample' in obj) $('counter').textContent='AIR SAMPLE: '+obj.airsample;
+  if(known && !('_cols' in obj)){
+    rows.push(KNOWN_COLS.map(k=>k in obj?obj[k]:'')); $('stored').textContent=rows.length;
+  } else if(!known){ log(raw); }
 }
 
 async function readLoop(){
-  const decoder=new TextDecoderStream();
-  port.readable.pipeTo(decoder.writable).catch(()=>{});
-  reader=decoder.readable.getReader();
+  const dec=new TextDecoderStream();
+  port.readable.pipeTo(dec.writable).catch(()=>{});
+  reader=dec.readable.getReader();
   let buf=''; keepReading=true;
   try{
     while(keepReading){
-      const {value,done}=await reader.read();
-      if(done) break;
+      const {value,done}=await reader.read(); if(done)break;
       buf+=value; let i;
       while((i=buf.indexOf('\n'))>=0){
         const line=buf.slice(0,i).replace(/\r$/,''); buf=buf.slice(i+1);
-        if(!line) continue;
+        if(!line)continue;
         rxCount++; $('rx').textContent=rxCount;
-        const obj=parseLine(line);
-        if(obj){
-          handleData(obj,line);
-          if(!('_cols' in obj)) captured.push(KNOWN_COLS.map(k=>k in obj?obj[k]:'').join(','));
-        }
+        const obj=parseLine(line); if(obj) handleData(obj,line);
       }
     }
   }catch(e){ log('✗ error de lectura: '+e.message); }
 }
 
 async function connect(){
-  if(!hasSerial) return;
+  if(!hasSerial)return;
   try{
     port=await navigator.serial.requestPort();
     await port.open({baudRate:parseInt($('baud').value,10)});
     writer=port.writable.getWriter();
-    $('state').textContent='conectado'; $('counter').classList.add('on');
-    $('connect').textContent='Disconnect'; $('send').disabled=false; $('save').disabled=false;
-    $('p_send').disabled=false; $('p_exper').disabled=false;
+    setPill('conectado',true); $('counter').classList.add('on');
+    $('connect').textContent='Disconnect';
+    ['send','saveXlsx','saveCsv','p_send','p_exper'].forEach(id=>$(id).disabled=false);
     log('✓ conectado a '+$('baud').value+' baudios'); readLoop();
-  }catch(e){ log('✗ no se pudo conectar: '+e.message); }
+  }catch(e){ log('✗ no se pudo conectar: '+e.message+'  (¿puerto ocupado por otro programa?)'); }
 }
 async function disconnect(){
   keepReading=false;
-  try{ if(reader){ await reader.cancel(); reader.releaseLock(); } }catch(e){}
-  try{ if(writer){ writer.releaseLock(); } }catch(e){}
-  try{ if(port){ await port.close(); } }catch(e){}
-  port=null;
-  $('state').textContent='desconectado'; $('counter').classList.remove('on');
-  $('connect').textContent='Connect'; $('send').disabled=true;
-  $('p_send').disabled=true; $('p_exper').disabled=true; log('— desconectado');
+  try{ if(reader){await reader.cancel();reader.releaseLock();} }catch(e){}
+  try{ if(writer){writer.releaseLock();} }catch(e){}
+  try{ if(port){await port.close();} }catch(e){}
+  port=null; setPill('desconectado',false); $('counter').classList.remove('on');
+  $('connect').textContent='Connect';
+  ['send','p_send','p_exper'].forEach(id=>$(id).disabled=true);
+  log('— desconectado');
 }
 $('connect').onclick=()=>{ port?disconnect():connect(); };
 
-async function sendCmd(){
-  const txt=$('cmd').value; if(!txt||!writer) return;
-  await writer.write(new TextEncoder().encode(txt+"\n"));
-  log('→ '+txt); $('cmd').value='';
-}
+async function sendRaw(txt){ if(!writer)return; await writer.write(new TextEncoder().encode(txt+"\n")); log('→ '+txt); }
+async function sendCmd(){ const t=$('cmd').value; if(!t||!writer)return; await sendRaw(t); $('cmd').value=''; }
 $('send').onclick=sendCmd;
 $('cmd').addEventListener('keydown',e=>{if(e.key==='Enter')sendCmd();});
 
-$('save').onclick=()=>{
-  const blob=new Blob([captured.join("\n")],{type:'text/csv'});
-  const a=document.createElement('a');
-  const ts=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
-  a.href=URL.createObjectURL(blob); a.download='captura_'+ts+'.csv'; a.click();
-  URL.revokeObjectURL(a.href);
+// ---- Guardar ----
+function stamp(){ return new Date().toISOString().slice(0,19).replace(/[:T]/g,'-'); }
+$('saveXlsx').onclick=()=>{
+  if(!rows.length){ log('No hay datos que guardar'); return; }
+  const ws=XLSX.utils.aoa_to_sheet([KNOWN_COLS,...rows]);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'datos');
+  XLSX.writeFile(wb,'datos_'+stamp()+'.xlsx');
+};
+$('saveCsv').onclick=()=>{
+  const csv=[KNOWN_COLS.join(','),...rows.map(r=>r.join(','))].join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='datos_'+stamp()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+};
+$('clear').onclick=()=>{
+  rows.length=0; $('stored').textContent='0';
+  Object.values(charts).forEach(c=>{c.data.labels=[];c.data.datasets[0].data=[];c.update('none');});
+  log('— datos y gráficas limpiados');
 };
 
-// ---- Panel de programación del experimento (comandos del manual Veggie-Nose) ----
-const PROFILES = {
+// ---- Panel experimento ----
+const PROFILES={
   sin:"400,395,381,359,331,300,269,241,219,205,200,205,219,241,269,300,331,359,381,395",
   tri:"400,380,360,340,320,300,280,260,240,220,200,220,240,260,280,300,320,340,360,380",
   esc:"400,400,200,200,400,400,240,240,400,400,280,280,400,400,320,320,400,400,360,360",
@@ -288,44 +315,41 @@ $('progToggle').onclick=()=>{
   p.style.display=show?'block':'none';
   $('progToggle').textContent='⚙ Programar experimento '+(show?'▴':'▾');
 };
-function applyProfile(){
-  const sel=$('p_profile').value;
-  const t=$('p_temps');
-  if(sel==='custom'){ t.readOnly=false; t.style.background='#fff'; }
-  else { t.value=PROFILES[sel]; t.readOnly=true; t.style.background='#f3f4f6'; }
-  updatePreview();
+function drawProfile(){
+  const c=$('profileCanvas'),g=c.getContext('2d'),W=c.width,H=c.height;
+  g.clearRect(0,0,W,H);
+  const vals=$('p_temps').value.split(',').map(parseFloat).filter(n=>!isNaN(n));
+  if(vals.length<2)return;
+  const mn=Math.min(...vals),mx=Math.max(...vals),rng=(mx-mn)||1;
+  g.strokeStyle='#2563eb'; g.lineWidth=1.8; g.beginPath();
+  vals.forEach((v,i)=>{const x=4+i*(W-8)/(vals.length-1);const y=H-4-((v-mn)/rng)*(H-8);i?g.lineTo(x,y):g.moveTo(x,y);});
+  g.stroke();
 }
-function mult20(v){ v=parseInt(v,10)||0; return Math.max(20, Math.round(v/20)*20); }
+function mult20(v){ v=parseInt(v,10)||0; return Math.max(20,Math.round(v/20)*20); }
 function buildCmds(){
-  const cyc=parseInt($('p_cyc').value,10)||1;
-  const ads=mult20($('p_ads').value);
-  const des=mult20($('p_des').value);
-  const temps=$('p_temps').value.trim();
-  return ["NADSOR;"+cyc, "TADSOR;"+ads, "TDESOR;"+des, "TPEXP;"+temps];
+  return ["NADSOR;"+(parseInt($('p_cyc').value,10)||1),
+          "TADSOR;"+mult20($('p_ads').value),
+          "TDESOR;"+mult20($('p_des').value),
+          "TPEXP;"+$('p_temps').value.trim()];
 }
-function updatePreview(){
-  $('p_preview').innerHTML='Se enviará:<br>'+buildCmds().map(c=>'<code>'+c+'</code>').join('<br>');
+function updatePreview(){ $('p_preview').innerHTML='Se enviará: '+buildCmds().map(c=>'<code>'+c+'</code>').join(''); drawProfile(); }
+function applyProfile(){
+  const sel=$('p_profile').value,t=$('p_temps');
+  if(sel==='custom'){t.readOnly=false;t.style.background='#fff';}
+  else{t.value=PROFILES[sel];t.readOnly=true;t.style.background='#f1f5f9';}
+  updatePreview();
 }
 ['p_cyc','p_ads','p_des','p_temps'].forEach(id=>$(id).addEventListener('input',updatePreview));
 $('p_profile').addEventListener('change',applyProfile);
 $('p_ads').addEventListener('change',()=>{$('p_ads').value=mult20($('p_ads').value);updatePreview();});
 $('p_des').addEventListener('change',()=>{$('p_des').value=mult20($('p_des').value);updatePreview();});
-
-async function sendRaw(txt){
-  if(!writer) return;
-  await writer.write(new TextEncoder().encode(txt+"\n"));
-  log('→ '+txt);
-}
 $('p_send').onclick=async()=>{
-  if(!writer){ log('✗ conecta primero para programar'); return; }
+  if(!writer){log('✗ conecta primero para programar');return;}
   for(const c of buildCmds()){ await sendRaw(c); await new Promise(r=>setTimeout(r,150)); }
   log('✓ experimento programado');
 };
-$('p_exper').onclick=async()=>{
-  if(!writer){ log('✗ conecta primero'); return; }
-  await sendRaw('EXPER'); log('▶ experimento iniciado');
-};
-applyProfile(); // rellena el perfil sinusoidal por defecto
+$('p_exper').onclick=async()=>{ if(!writer){log('✗ conecta primero');return;} await sendRaw('EXPER'); log('▶ experimento iniciado'); };
+applyProfile();
 </script>
 </body>
 </html>
