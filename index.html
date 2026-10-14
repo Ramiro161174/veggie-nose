@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sensor Dashboard Web</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f3f4f6; --panel:#ffffff; --ink:#1f2937; --muted:#6b7280;
+    --line:#d1d5db; --ok:#16a34a; --bad:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Segoe UI,system-ui,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:#eef0f3;border-bottom:1px solid var(--line)}
+  input[type=text]{flex:1;min-width:150px;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px}
+  select,button{padding:9px 14px;border:none;border-radius:6px;font-size:14px;cursor:pointer}
+  button{background:linear-gradient(#5aa0f7,#3b82f6);color:#fff;font-weight:600}
+  button:hover{filter:brightness(1.05)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  select{background:#fff;border:1px solid var(--line)}
+  .baud{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+  .counter{margin-left:auto;background:var(--bad);color:#fff;font-weight:700;padding:9px 16px;border-radius:6px}
+  .counter.on{background:var(--ok)}
+  main{display:grid;grid-template-columns:1fr 300px;gap:12px;padding:12px}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:620px){.charts{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px}
+  .card h3{margin:2px 0 6px;font-size:13px;color:var(--muted);text-align:center;font-weight:600}
+  .chartbox{position:relative;height:150px}
+  .side h3{margin:0 0 8px;font-size:14px}
+  .readout{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin-bottom:10px}
+  .readout div{font-size:13px}
+  .readout span{font-weight:700}
+  #log{background:#fafafa;border:1px solid var(--line);border-radius:6px;height:220px;overflow:auto;padding:8px;font-family:Consolas,monospace;font-size:11px;white-space:pre-wrap;word-break:break-word}
+  .status{font-size:12px;color:var(--muted);padding:6px 12px}
+  .status b{color:var(--ink)}
+  .warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:8px 12px;margin:0 12px;border-radius:6px;font-size:13px}
+  .progbar{padding:8px 12px 0}
+  button.ghost{background:#e5e7eb;color:var(--ink)}
+  .progpanel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:8px}
+  .pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:760px){.pgrid{grid-template-columns:1fr 1fr}}
+  .progpanel label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:4px}
+  .progpanel label.wide{grid-column:1/-1;margin-top:8px}
+  .progpanel input{padding:7px 8px;border:1px solid var(--line);border-radius:6px;font-size:14px;color:var(--ink)}
+  .prow{display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
+  .preview{flex:1;font-size:13px;color:var(--muted)}
+  .preview code{background:#f3f4f6;padding:3px 7px;border-radius:4px;color:#111;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <input id="cmd" type="text" placeholder="Comando a enviar…" autocomplete="off">
+  <button id="send" disabled>Send</button>
+  <div class="baud">baudios
+    <select id="baud">
+      <option>9600</option><option>19200</option><option>38400</option>
+      <option>57600</option><option selected>115200</option><option>230400</option><option>921600</option>
+    </select>
+  </div>
+  <button id="connect">Connect</button>
+  <button id="save" disabled>Save File</button>
+  <div id="counter" class="counter">AIR SAMPLE: 0</div>
+</header>
+
+<div id="nowebserial" class="warn" style="display:none">
+  Este navegador no permite Web Serial. Abre la página en <b>Chrome</b> o <b>Edge</b> de escritorio (no Firefox, no móvil) y servida por <b>https://</b> o localhost.
+</div>
+
+<div class="progbar">
+  <button id="progToggle" class="ghost">⚙ Programar experimento ▾</button>
+  <div id="progPanel" class="progpanel" style="display:none">
+    <div class="pgrid">
+      <label>Nº de ciclos (NADSOR)
+        <input id="p_cyc" type="number" min="1" step="1" value="4"></label>
+      <label>Tiempo de adsorción (TADSOR) — múltiplos de 20
+        <input id="p_ads" type="number" min="20" step="20" value="20"></label>
+      <label>Tiempo de desorción (TDESOR) — múltiplos de 20
+        <input id="p_des" type="number" min="20" step="20" value="20"></label>
+      <label>Perfil de temperatura (TPEXP)
+        <select id="p_profile">
+          <option value="sin">Sinusoidal (por defecto)</option>
+          <option value="tri">Triangular</option>
+          <option value="esc">Escalonado</option>
+          <option value="custom">Personalizado…</option>
+        </select>
+      </label>
+      <label class="wide">Valores de temperatura — 20 valores °C separados por coma
+        <input id="p_temps" type="text"></label>
+    </div>
+    <div class="prow">
+      <button id="p_send" disabled>Programar (envía NADSOR, TADSOR, TDESOR, TPEXP)</button>
+      <button id="p_exper" disabled style="background:linear-gradient(#22c55e,#16a34a)">▶ Empezar experimento (EXPER)</button>
+    </div>
+    <div class="preview" id="p_preview" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<div class="status">Estado: <b id="state">desconectado</b> · Muestras: <b id="rx">0</b></div>
+
+<main>
+  <div class="charts">
+    <div class="card"><h3>gas_resistance (Ω)</h3><div class="chartbox"><canvas id="c_gas"></canvas></div></div>
+    <div class="card"><h3>raw_voc</h3><div class="chartbox"><canvas id="c_voc"></canvas></div></div>
+    <div class="card"><h3>hp0</h3><div class="chartbox"><canvas id="c_hp0"></canvas></div></div>
+    <div class="card"><h3>hp1</h3><div class="chartbox"><canvas id="c_hp1"></canvas></div></div>
+    <div class="card"><h3>hp2</h3><div class="chartbox"><canvas id="c_hp2"></canvas></div></div>
+    <div class="card"><h3>hp3</h3><div class="chartbox"><canvas id="c_hp3"></canvas></div></div>
+  </div>
+  <div class="side card">
+    <h3>Information:</h3>
+    <div class="readout">
+      <div>Temp: <span id="r_temp">—</span> °C</div>
+      <div>Humedad: <span id="r_hum">—</span> %</div>
+      <div>Presión: <span id="r_pres">—</span></div>
+      <div>raw_nox: <span id="r_nox">—</span></div>
+      <div>Índice: <span id="r_idx">—</span></div>
+      <div>timestamp: <span id="r_ts">—</span></div>
+    </div>
+    <div id="log"></div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const hasSerial = 'serial' in navigator;
+if(!hasSerial){ $('nowebserial').style.display='block'; $('connect').disabled=true; }
+
+// Columnas reales de la nariz (orden del archivo de datos)
+const KNOWN_COLS = ["timestamp","temperature","pressure","humidity","gas_resistance",
+  "raw_voc","raw_nox","hp0","hp1","hp2","hp3","indice","airsample"];
+
+// ---- Gráficas ----
+const WINDOW = 200;
+function makeChart(ctx,color){
+  return new Chart(ctx,{type:'line',
+    data:{labels:[],datasets:[{data:[],borderColor:color,borderWidth:1.5,pointRadius:0,tension:.2}]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{display:false},y:{ticks:{font:{size:10}}}}}});
+}
+const charts = {
+  gas_resistance: makeChart($('c_gas'),'#2563eb'),
+  raw_voc:        makeChart($('c_voc'),'#16a34a'),
+  hp0:            makeChart($('c_hp0'),'#d97706'),
+  hp1:            makeChart($('c_hp1'),'#db2777'),
+  hp2:            makeChart($('c_hp2'),'#7c3aed'),
+  hp3:            makeChart($('c_hp3'),'#0891b2'),
+};
+function push(ch,val){
+  const c=charts[ch]; if(!c||val==null||isNaN(val)) return;
+  c.data.labels.push(''); c.data.datasets[0].data.push(val);
+  if(c.data.labels.length>WINDOW){c.data.labels.shift();c.data.datasets[0].data.shift();}
+  c.update('none');
+}
+
+// ---- Estado ----
+let port=null, reader=null, writer=null, keepReading=false;
+let rxCount=0;
+const captured=[KNOWN_COLS.join(",")];   // para "Save File" (CSV con cabecera)
+let headerCols=null;
+
+function log(line){
+  const el=$('log'); el.textContent += line+"\n"; el.scrollTop=el.scrollHeight;
+  if(el.textContent.length>40000) el.textContent=el.textContent.slice(-30000);
+}
+
+// ---- Parseo de cada línea ----
+function parseLine(line){
+  line=line.trim(); if(!line) return null;
+  if(line[0]==='{'){ try{ return JSON.parse(line); }catch(e){} }
+  // pares clave:valor
+  if(/[a-z_]+\s*[:=]\s*-?\d/i.test(line)){
+    const obj={}; let any=false;
+    line.split(/[;,]|\s{2,}|\t/).forEach(tok=>{
+      const m=tok.split(/[:=]/);
+      if(m.length===2){const k=m[0].trim();const v=parseFloat(m[1]);if(k&&!isNaN(v)){obj[k]=v;any=true;}}
+    });
+    if(any) return obj;
+  }
+  // CSV
+  const parts=line.split(/[;,\t ]+/).map(s=>s.trim()).filter(s=>s!=='');
+  const nums=parts.map(parseFloat);
+  const allNum = nums.length>1 && nums.every(n=>!isNaN(n));
+  if(allNum){
+    const cols = headerCols || (nums.length===KNOWN_COLS.length ? KNOWN_COLS : null);
+    if(cols){ const o={}; cols.forEach((k,i)=>o[k]=nums[i]); return o; }
+    return {_cols:nums};
+  }
+  // cabecera de texto
+  if(parts.length>1 && /[a-z]/i.test(line) && nums.some(isNaN)){
+    headerCols=parts; log('» cabecera: '+parts.join(', ')); return null;
+  }
+  return null;
+}
+
+const setTxt=(id,v,dec)=>{ if(v!=null&&!isNaN(v)) $(id).textContent=(dec!=null?(+v).toFixed(dec):v); };
+
+function handleData(obj,raw){
+  let known=false;
+  for(const k of ['gas_resistance','raw_voc','hp0','hp1','hp2','hp3']){
+    if(k in obj){ push(k,obj[k]); known=true; }
+  }
+  if('temperature' in obj){ setTxt('r_temp',obj.temperature,2); known=true; }
+  if('humidity'    in obj){ setTxt('r_hum',obj.humidity,1); }
+  if('pressure'    in obj){ setTxt('r_pres',obj.pressure,0); }
+  if('raw_nox'     in obj){ setTxt('r_nox',obj.raw_nox,0); }
+  if('indice'      in obj){ setTxt('r_idx',obj.indice,0); }
+  if('timestamp'   in obj){ setTxt('r_ts',obj.timestamp,0); }
+  if('airsample'   in obj){ $('counter').textContent='AIR SAMPLE: '+obj.airsample; }
+  if(!known) log(raw);   // formato no reconocido: lo muestra para calibrar
+}
+
+async function readLoop(){
+  const decoder=new TextDecoderStream();
+  port.readable.pipeTo(decoder.writable).catch(()=>{});
+  reader=decoder.readable.getReader();
+  let buf=''; keepReading=true;
+  try{
+    while(keepReading){
+      const {value,done}=await reader.read();
+      if(done) break;
+      buf+=value; let i;
+      while((i=buf.indexOf('\n'))>=0){
+        const line=buf.slice(0,i).replace(/\r$/,''); buf=buf.slice(i+1);
+        if(!line) continue;
+        rxCount++; $('rx').textContent=rxCount;
+        const obj=parseLine(line);
+        if(obj){
+          handleData(obj,line);
+          if(!('_cols' in obj)) captured.push(KNOWN_COLS.map(k=>k in obj?obj[k]:'').join(','));
+        }
+      }
+    }
+  }catch(e){ log('✗ error de lectura: '+e.message); }
+}
+
+async function connect(){
+  if(!hasSerial) return;
+  try{
+    port=await navigator.serial.requestPort();
+    await port.open({baudRate:parseInt($('baud').value,10)});
+    writer=port.writable.getWriter();
+    $('state').textContent='conectado'; $('counter').classList.add('on');
+    $('connect').textContent='Disconnect'; $('send').disabled=false; $('save').disabled=false;
+    $('p_send').disabled=false; $('p_exper').disabled=false;
+    log('✓ conectado a '+$('baud').value+' baudios'); readLoop();
+  }catch(e){ log('✗ no se pudo conectar: '+e.message); }
+}
+async function disconnect(){
+  keepReading=false;
+  try{ if(reader){ await reader.cancel(); reader.releaseLock(); } }catch(e){}
+  try{ if(writer){ writer.releaseLock(); } }catch(e){}
+  try{ if(port){ await port.close(); } }catch(e){}
+  port=null;
+  $('state').textContent='desconectado'; $('counter').classList.remove('on');
+  $('connect').textContent='Connect'; $('send').disabled=true;
+  $('p_send').disabled=true; $('p_exper').disabled=true; log('— desconectado');
+}
+$('connect').onclick=()=>{ port?disconnect():connect(); };
+
+async function sendCmd(){
+  const txt=$('cmd').value; if(!txt||!writer) return;
+  await writer.write(new TextEncoder().encode(txt+"\n"));
+  log('→ '+txt); $('cmd').value='';
+}
+$('send').onclick=sendCmd;
+$('cmd').addEventListener('keydown',e=>{if(e.key==='Enter')sendCmd();});
+
+$('save').onclick=()=>{
+  const blob=new Blob([captured.join("\n")],{type:'text/csv'});
+  const a=document.createElement('a');
+  const ts=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.href=URL.createObjectURL(blob); a.download='captura_'+ts+'.csv'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+// ---- Panel de programación del experimento (comandos del manual Veggie-Nose) ----
+const PROFILES = {
+  sin:"400,395,381,359,331,300,269,241,219,205,200,205,219,241,269,300,331,359,381,395",
+  tri:"400,380,360,340,320,300,280,260,240,220,200,220,240,260,280,300,320,340,360,380",
+  esc:"400,400,200,200,400,400,240,240,400,400,280,280,400,400,320,320,400,400,360,360",
+};
+$('progToggle').onclick=()=>{
+  const p=$('progPanel'); const show=p.style.display==='none';
+  p.style.display=show?'block':'none';
+  $('progToggle').textContent='⚙ Programar experimento '+(show?'▴':'▾');
+};
+function applyProfile(){
+  const sel=$('p_profile').value;
+  const t=$('p_temps');
+  if(sel==='custom'){ t.readOnly=false; t.style.background='#fff'; }
+  else { t.value=PROFILES[sel]; t.readOnly=true; t.style.background='#f3f4f6'; }
+  updatePreview();
+}
+function mult20(v){ v=parseInt(v,10)||0; return Math.max(20, Math.round(v/20)*20); }
+function buildCmds(){
+  const cyc=parseInt($('p_cyc').value,10)||1;
+  const ads=mult20($('p_ads').value);
+  const des=mult20($('p_des').value);
+  const temps=$('p_temps').value.trim();
+  return ["NADSOR;"+cyc, "TADSOR;"+ads, "TDESOR;"+des, "TPEXP;"+temps];
+}
+function updatePreview(){
+  $('p_preview').innerHTML='Se enviará:<br>'+buildCmds().map(c=>'<code>'+c+'</code>').join('<br>');
+}
+['p_cyc','p_ads','p_des','p_temps'].forEach(id=>$(id).addEventListener('input',updatePreview));
+$('p_profile').addEventListener('change',applyProfile);
+$('p_ads').addEventListener('change',()=>{$('p_ads').value=mult20($('p_ads').value);updatePreview();});
+$('p_des').addEventListener('change',()=>{$('p_des').value=mult20($('p_des').value);updatePreview();});
+
+async function sendRaw(txt){
+  if(!writer) return;
+  await writer.write(new TextEncoder().encode(txt+"\n"));
+  log('→ '+txt);
+}
+$('p_send').onclick=async()=>{
+  if(!writer){ log('✗ conecta primero para programar'); return; }
+  for(const c of buildCmds()){ await sendRaw(c); await new Promise(r=>setTimeout(r,150)); }
+  log('✓ experimento programado');
+};
+$('p_exper').onclick=async()=>{
+  if(!writer){ log('✗ conecta primero'); return; }
+  await sendRaw('EXPER'); log('▶ experimento iniciado');
+};
+applyProfile(); // rellena el perfil sinusoidal por defecto
+</script>
+</body>
+</html>
